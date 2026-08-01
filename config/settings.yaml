@@ -1,0 +1,80 @@
+# Default runtime parameters for the crowd density estimation pipeline.
+# All values here can be overridden interactively at runtime, or by loading
+# a saved run-config JSON file for headless / embedded execution.
+
+detection:
+  conf_threshold: 0.60      # YOLO: minimum box confidence. P2PNet: minimum point-confidence. Higher -> fewer false positives, may miss partially visible people.
+  iou_threshold: 0.45       # NMS IoU threshold used by the detector. YOLO only.
+  target_class: 0           # Class index to keep (0 = "person" for both the fine-tuned model and stock COCO models). YOLO only.
+  tracker: "bytetrack.yaml" # Ultralytics tracker config, used only to assign stable IDs for display. YOLO only.
+
+heatmap:
+  mode: "instantaneous"     # "instantaneous" (per-frame snapshot) | "cumulative" (temporal decay) | "classic" (vivid, per-frame normalized). yolo/p2pnet only.
+  sigma_ratio: 0.35         # instantaneous/cumulative: Gaussian blob radius as a fraction of bbox width, anchored at the feet. Box-based backends only (YOLO).
+  classic_sigma_ratio: 0.25 # classic mode: Gaussian blob radius as a fraction of max(box_w, box_h), anchored at the box center. Box-based backends only (YOLO).
+  point_sigma: 25.0         # fixed Gaussian radius in pixels for point-based backends (P2PNet), used in ALL heatmap modes instead of a box-derived sigma,
+                             # since a point has no real box size to scale from. 25px matches what looked visually best when comparing against a reference script.
+  decay: 0.97                # Cumulative mode only: fraction of past density kept each frame.
+  blur_kernel: 51             # instantaneous/cumulative only: Gaussian blur applied before colorizing (classic mode skips this).
+  intensity_ceiling: 5.0     # Starting reference density value mapped to full-red; adapts slowly so colors stay comparable across frames.
+  overlay_alpha: 0.65         # Maximum opacity of the heatmap overlay on top of the frame.
+  background_darken: 0.6     # Brightness multiplier applied to the frame before overlaying a heatmap (streams with no heatmap are unaffected).
+  noise_floor: 0.0           # 0-1: zero out speckle below this fraction of the color ceiling. Cosmetic only - see core/heatmap.py docstring for why it can't fix false-positive clutter activations.
+
+counting:
+  smoothing: 0.15            # EMA factor for the displayed crowd count (0-1). Higher -> reacts faster but jitters more.
+
+# -------------------------------------------------------------------
+# CSRNet-specific post-processing, developed to mitigate the false-positive
+# failure mode documented in REPORT.md: on footage unlike CSRNet's
+# ShanghaiTech Part A training data, head-shaped clutter (a flower basket,
+# bicycle wheels) can trigger real density activations - this cannot be
+# fixed by a threshold on the output alone (see core/csrnet.py). Two
+# counting methods are available:
+#   density_sum : the standard CSRNet method - count = sum of the density map.
+#                  Accurate on in-domain footage; over-counts when
+#                  clutter contributes density mass on unfamiliar footage.
+#   peak_detect : count = number of local maxima in a smoothed density map,
+#                  one per detected head. Diffuse clutter blobs tend to
+#                  collapse into fewer/broader peaks than distinct heads
+#                  do, so this typically undercounts clutter relative to
+#                  genuine heads - but it is a heuristic, not a guarantee:
+#                  clutter producing one sharp, head-sized peak is still
+#                  counted. See REPORT.md for the full discussion.
+# -------------------------------------------------------------------
+csrnet:
+  density_threshold: 0.001   # Zero out density values below this (mild noise floor, unrelated to the clutter issue).
+  blur_sigma: 1.5             # Gaussian smoothing sigma in density-map pixels (1 density-px = 8 frame-px at CSRNet's 1/8 output stride).
+                               # Matched roughly to head scale: merges sub-head-scale spikes while preserving head-sized blobs.
+  count_method: "density_sum" # "density_sum" (classic, default) or "peak_detect" (mitigation - try this if counts look inflated by clutter).
+  peak_min_height: 0.005      # [peak_detect only] Minimum peak value to count as a person. Raise if false positives persist; lower if real people vanish.
+  peak_nms_radius: 1          # [peak_detect only] Two peaks must be at least 2*radius+1 density-map pixels apart. Keep small to avoid merging close people.
+  intensity_ceiling: 0.01     # Heatmap starting reference - CSRNet's raw density values are tiny (~0.001-0.05), much smaller than heatmap.intensity_ceiling (tuned for YOLO).
+
+output:
+  video_fps: 30
+  video_codec: "mp4v"
+  image_format: "jpg"
+  # save_as ("video" | "images") is asked interactively; no default needed here.
+
+# Local clones of upstream repos, needed only by dmcount/p2pnet (their model
+# architecture is imported from the clone itself - see core/dmcount.py and
+# core/p2pnet.py for why). Fill these in once and the CLI will offer them as
+# defaults; leave blank to be prompted every run.
+external_repos:
+  dmcount: ""   # e.g. "/home/you/DM-Count"
+  p2pnet: ""    # e.g. "/home/you/CrowdCounting-P2PNet"
+
+# P2PNet-specific settings (its confidence threshold reuses detection.conf_threshold above).
+p2pnet:
+  backbone: "vgg16_bn"
+  row: 2
+  line: 2
+  marker_half_size: 12.0     # pseudo-detection box half-size used for heatmap/rendering, since P2PNet gives points, not box sizes.
+
+# backend is selected explicitly in the CLI (not inferred from the file
+# extension, since DM-Count and P2PNet checkpoints are both plain .pth):
+#   yolo    -> bounding-box detector + tracker; 3 output streams
+#   csrnet  -> specialized, native density map; 1 output stream, no boxes/IDs
+#   dmcount -> specialized, native density map; 1 output stream, no boxes/IDs
+#   p2pnet  -> specialized, point locations;    3 output streams, no track IDs

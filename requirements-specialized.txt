@@ -1,0 +1,12 @@
+# Only needed for backends other than YOLO.
+torch>=2.0
+torchvision>=0.15
+
+# CSRNet and DM-Count run fully with just the two packages above.
+#
+# DM-Count and P2PNet additionally require a local clone of their own repo
+# (see core/dmcount.py / core/p2pnet.py and weights/README.txt) - install
+# THAT repo's own requirements.txt too, since this project deliberately does
+# not vendor or guess their dependency list:
+#   pip install -r <path-to-DM-Count-clone>/requirements.txt
+#   pip install -r <path-to-P2PNet-clone>/requirements.txt

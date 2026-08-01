@@ -1,0 +1,27 @@
+# Template systemd unit for running the pipeline unattended on the embedded
+# board (e.g. Jetson / Raspberry Pi). Not used on the laptop demo.
+#
+# Setup on the board:
+#   1. Copy the whole project to the board and install requirements.txt.
+#   2. Run `python main.py` once interactively to pick the real camera /
+#      model / heatmap settings; this writes outputs/run_<ts>/run_config.json.
+#   3. Copy that json to config/board_config.json and adjust the "camera"
+#      source path to the board's actual CCTV/RTSP address if needed.
+#   4. Copy this file to /etc/systemd/system/crowd_monitor.service,
+#      fix the paths below, then:
+#         sudo systemctl daemon-reload
+#         sudo systemctl enable --now crowd_monitor.service
+#
+# [Unit]
+# Description=Sidewalk Crowd Density Estimation
+# After=network.target
+#
+# [Service]
+# Type=simple
+# WorkingDirectory=/home/pi/crowd_estimation
+# ExecStart=/usr/bin/python3 main.py --config config/board_config.json --no-display
+# Restart=on-failure
+# RestartSec=5
+#
+# [Install]
+# WantedBy=multi-user.target
