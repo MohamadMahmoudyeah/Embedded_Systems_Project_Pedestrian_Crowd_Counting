@@ -3,12 +3,20 @@ __pycache__/
 
 weights/yolo/*
 !weights/yolo/.gitkeep
+!weights/yolo/*.txt
+
 weights/csrnet/*
 !weights/csrnet/.gitkeep
+!weights/csrnet/*.txt
+
 weights/dmcount/*
 !weights/dmcount/.gitkeep
+!weights/dmcount/*.txt
+
 weights/p2pnet/*
 !weights/p2pnet/.gitkeep
+!weights/p2pnet/*.txt
+
 
 outputs/*
 !outputs/.gitkeep
